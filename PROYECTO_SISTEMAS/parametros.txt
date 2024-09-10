@@ -1,2 +1,2 @@
-Procesadores -4
+Procesadores 0
 Hilos 2

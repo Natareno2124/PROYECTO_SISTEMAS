@@ -15,6 +15,18 @@ int K; //hilos
 
 mutex mtx;
 
+//Estructura de los procesos
+struct Proceso {
+	int ProcessId;
+	int ParentProcessId;
+	string ProgramCounter;
+	int Registros;
+	int Tamano;
+	int Hilos;
+	int Quantum;
+	int Iteracion;
+};
+
 
 
  
@@ -29,7 +41,7 @@ void lectura(const string &parametros) {
 	while (archivo >> clave) {
 		if (clave == "Procesadores") {
 			archivo >> N;
-			if (N<0)
+			if (N<=0)
 			{
 				cout << "Error no se admiten parametros negativos." << endl;
 				exit(1);
