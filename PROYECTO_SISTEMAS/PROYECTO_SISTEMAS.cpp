@@ -26,6 +26,7 @@ struct Proceso {
 	int Quantum;
 	int Iteracion;
 	int prueba;		//probando declarar variable 
+	int prueba2; //Prueba numero 2
 };
 
 
