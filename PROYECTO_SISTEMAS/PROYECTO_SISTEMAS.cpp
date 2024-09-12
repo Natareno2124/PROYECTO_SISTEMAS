@@ -25,6 +25,7 @@ struct Proceso {
 	int Hilos;
 	int Quantum;
 	int Iteracion;
+	int prueba;		//probando declarar variable 
 };
 
 
