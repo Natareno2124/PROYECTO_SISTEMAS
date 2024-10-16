@@ -1,2 +1,0 @@
-Procesadores 0
-Hilos 2
