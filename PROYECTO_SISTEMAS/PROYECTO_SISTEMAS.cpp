@@ -180,6 +180,18 @@ void cargar_procesos_desde_archivo(string archivo, MultilevelFeedbackQueueSchedu
     infile.close();
 }
 
+
+//Funcion para validar si tiene decimales
+bool contiene_decimales(const string& texto) {
+    for (int i = 0; i < texto.length(); i++) {
+        if (texto[i] == '.') {
+            return true;
+        }
+    }
+    return false;
+}
+
+
 int main() {
     MultilevelFeedbackQueueScheduler scheduler;
 
