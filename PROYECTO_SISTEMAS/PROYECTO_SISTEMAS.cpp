@@ -38,7 +38,7 @@ public:
 
     void ejecutar(int quantum) {
         cout << "Ejecutando Proceso " << pid << " en estado " << estado << endl;
-        estado = "ejecución";
+        estado = "ejecucion";
         this_thread::sleep_for(chrono::seconds(quantum));
         iteracion--;
         tiempo_ejecucion += quantum;
@@ -49,7 +49,7 @@ public:
         }
         else {
             estado = "listo";
-            cout << "Proceso " << pid << " ha completado " << quantum << " segundos de ejecución, le quedan " << iteracion << " iteraciones" << endl;
+            cout << "Proceso " << pid << " ha completado " << quantum << " segundos de ejecucion, le quedan " << iteracion << " iteraciones" << endl;
         }
     }
 };
@@ -122,59 +122,54 @@ public:
     }
 };
 
-// Función para cargar procesos desde archivo .dat con manejo de errores
+// Función para cargar procesos desde archivo con validación de caracteres no numéricos y números negativos
 void cargar_procesos_desde_archivo(string archivo, MultilevelFeedbackQueueScheduler& scheduler) {
     ifstream infile(archivo);
-    if (!infile.is_open()) {
-        cerr << "Error al abrir el archivo: " << archivo << endl;
-        return;
-    }
-
     string line;
     while (getline(infile, line)) {
-        // Verifica si la línea está vacía
-        if (line.empty()) {
-            cerr << "Línea vacía encontrada, saltando..." << endl;
+        istringstream ss(line);
+        string item;
+        vector<string> data;
+
+        // Parsear los datos del proceso desde la línea usando '|' como delimitador
+        while (getline(ss, item, '|')) {
+            data.push_back(item);
+        }
+
+        // Verificar que se hayan leído todos los campos necesarios
+        if (data.size() != 8) {
+            cout << "Error: Numero incorrecto de campos en la linea: " << line << endl;
             continue;
         }
 
         try {
-            stringstream ss(line);
-            string item;
-            vector<string> data;
+            // Validar que los valores numéricos no contengan letras u otros caracteres no válidos
+            int pid = stoi(data[0]);
+            int ppid = stoi(data[1]);
+            string pc = data[2];  // Este campo puede ser una cadena, no necesita validación numérica
+            int registros = stoi(data[3]);
+            int tamano = stoi(data[4]);
+            int hilos = stoi(data[5]);
+            int quantum = stoi(data[6]);
+            int iteracion = stoi(data[7]);
 
-            // Usar '|' como delimitador
-            while (getline(ss, item, '|')) {
-                data.push_back(item);
+            // Validar que ningún valor numérico sea negativo
+            if (pid < 0 || ppid < 0 || registros < 0 || tamano < 0 || hilos < 0 || quantum < 0 || iteracion < 0) {
+                cout << "Error: Proceso con parametros negativos encontrado. Linea: " << line << endl;
+                continue;  // Saltar este proceso y continuar con el siguiente
             }
 
-            // Verifica si el número de campos es el correcto
-            if (data.size() != 8) {
-                cerr << "Error: Se esperaban 8 campos pero se encontraron " << data.size() << ". Saltando línea..." << endl;
-                continue;
-            }
-
-            // Crear un nuevo proceso con los datos obtenidos
-            Proceso* proceso = new Proceso(
-                stoi(data[0]),  // pid
-                stoi(data[1]),  // ppid
-                data[2],        // pc
-                stoi(data[3]),  // registros
-                stoi(data[4]),  // tamano
-                stoi(data[5]),  // hilos
-                stoi(data[6]),  // quantum
-                stoi(data[7])   // iteracion
-            );
-
-            // Agregar el proceso al scheduler
+            // Si los valores son válidos, crear el proceso y agregarlo al scheduler
+            Proceso* proceso = new Proceso(pid, ppid, pc, registros, tamano, hilos, quantum, iteracion);
             scheduler.agregar_proceso(proceso);
-
         }
         catch (const invalid_argument& e) {
-            cerr << "Error al convertir los datos de la línea: " << line << ". Error: " << e.what() << endl;
+            // Si ocurre una excepción al convertir un valor a número, significa que se ingresó una letra u otro carácter no numérico
+            cout << "Error: Caracteres no numericos en un campo numerico. Linea: " << line << endl;
         }
         catch (const out_of_range& e) {
-            cerr << "Valor fuera de rango en la línea: " << line << ". Error: " << e.what() << endl;
+            // Manejar valores fuera del rango de los tipos de datos
+            cout << "Error: Valor fuera de rango en la linea: " << line << ". Error: " << e.what() << endl;
         }
     }
     infile.close();
@@ -183,7 +178,7 @@ void cargar_procesos_desde_archivo(string archivo, MultilevelFeedbackQueueSchedu
 int main() {
     MultilevelFeedbackQueueScheduler scheduler;
 
-    // Cargar procesos desde el archivo 'procesos.dat'
+    // Cargar los procesos desde el archivo
     cargar_procesos_desde_archivo("procesos.dat", scheduler);
 
     // Ejecutar los procesos
