@@ -176,14 +176,32 @@ void cargar_procesos_desde_archivo(string archivo, MultilevelFeedbackQueueSchedu
 }
 
 
-//Funcion para validar si tiene decimales
-bool contiene_decimales(const string& texto) {
-    for (int i = 0; i < texto.length(); i++) {
-        if (texto[i] == '.') {
-            return true;
+void contiene_decimales(const string& nombreArchivo) {
+    ifstream archivo(nombreArchivo);
+    string linea;
+
+    // Verificamos si el archivo se pudo abrir correctamente
+    if (!archivo.is_open()) {
+        cout << "No se pudo abrir el archivo: " << nombreArchivo << endl;
+        return;
+    }
+
+    // Leemos línea por línea
+    while (getline(archivo, linea)) {
+        // Recorremos cada carácter 
+        bool tiene_decimales = false;
+        for (int i = 0; i < linea.length(); i++) {
+            if (linea[i] == '.') {
+                cout << "El valor \"" << linea << "\" tiene decimales. Pasando al siguiente valor." << endl;
+                tiene_decimales = true;
+                break;  // Terminamos la búsqueda para esta línea
+            }
+        }
+
+        // Si no tiene decimales, no hacemos nada
+        if (!tiene_decimales) {
         }
     }
-    return false;
 }
 
 
@@ -192,6 +210,9 @@ int main() {
 
     // Cargar los procesos desde el archivo
     cargar_procesos_desde_archivo("procesos.dat", scheduler);
+
+    //validacion de decimaels 
+    contiene_decimales("procesos.dat");
 
     // Ejecutar los procesos
     scheduler.ejecutar_procesos();
