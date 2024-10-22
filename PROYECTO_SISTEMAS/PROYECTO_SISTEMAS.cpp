@@ -59,6 +59,7 @@ public:
     queue<Proceso*> cola_A;
     queue<Proceso*> cola_B;
     queue<Proceso*> cola_C;
+    queue<Proceso*> cola_espera;  // Cola para procesos que esperan por hilos
     int tiempo_total;
     int ultimo_tiempo_promocion;
     int hilos_disponibles;
@@ -272,9 +273,6 @@ int main() {
 
     // Cargar los procesos desde el archivo (saltando las dos primeras líneas ya leídas)
     cargar_procesos_desde_archivo("procesos.dat", scheduler, procesadores, hilos_totales);
-
-    //validacion de decimaels 
-    contiene_decimales("procesos.dat");
 
     // Ejecutar los procesos
     scheduler.ejecutar_procesos();
