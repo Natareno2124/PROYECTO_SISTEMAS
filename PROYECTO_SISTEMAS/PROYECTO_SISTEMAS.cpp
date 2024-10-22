@@ -154,8 +154,7 @@ public:
     }
 };
 
-
-// Función para cargar procesos desde archivo con validación de caracteres no numéricos y números negativos
+// Función para cargar procesos que no sean 0
 void cargar_procesos_desde_archivo(string archivo, MultilevelFeedbackQueueScheduler& scheduler, int& procesadores, int& hilos_totales) {
     ifstream infile(archivo);
     string line;
@@ -169,10 +168,18 @@ void cargar_procesos_desde_archivo(string archivo, MultilevelFeedbackQueueSchedu
         // Leer las dos primeras líneas para capturar los procesadores e hilos
         if (linea_actual == 1) {
             ss >> item >> procesadores;  // Leer el número de procesadores
+            if (procesadores == 0) {
+                cout << "Error: El numero de procesadores no puede ser 0. Por favor, ingrese un numero valido." << endl;
+                return;
+            }
             continue;
         }
         if (linea_actual == 2) {
             ss >> item >> hilos_totales;  // Leer el número de hilos totales
+            if (hilos_totales == 0) {
+                cout << "Error: El numero de hilos no puede ser 0. Por favor, ingrese un numero valido." << endl;
+                return;
+            }
             continue;
         }
 
@@ -201,9 +208,9 @@ void cargar_procesos_desde_archivo(string archivo, MultilevelFeedbackQueueSchedu
             int quantum = stoi(data[6]);
             int iteracion = stoi(data[7]);
 
-            // Validar que ningún valor numérico sea negativo y que los hilos no excedan los hilos totales disponibles
-            if (pid < 0 || ppid < 0 || registros < 0 || tamano < 0 || hilos < 0 || quantum < 0 || iteracion < 0 || hilos > hilos_totales) {
-                cout << "Error: Proceso con parametros negativos o exceso de hilos encontrado. Linea: " << line << endl;
+            // Validar que ningún valor numérico sea negativo o cero
+            if (pid <= 0 || ppid <= 0 || registros <= 0 || tamano <= 0 || hilos <= 0 || quantum <= 0 || iteracion <= 0) {
+                cout << "Error: Proceso con valores negativos o cero en la linea: " << line << endl;
                 continue;
             }
 
@@ -221,60 +228,50 @@ void cargar_procesos_desde_archivo(string archivo, MultilevelFeedbackQueueSchedu
     infile.close();
 }
 
+// Función para validar si tiene decimales
+void contiene_decimales(const string& nombreArchivo) {
+    ifstream archivo(nombreArchivo);
+    string linea;
 
+    // Verificamos si el archivo se pudo abrir correctamente
+    if (!archivo.is_open()) {
+        cout << "No se pudo abrir el archivo: " << nombreArchivo << endl;
+        return;
+    }
 
-//Funcion para validar si tiene decimales
-bool contiene_decimales(const string& texto) {
-    for (int i = 0; i < texto.length(); i++) {
-        if (texto[i] == '.') {
-            return true;
+    // Leemos línea por línea
+    while (getline(archivo, linea)) {
+        // Recorremos cada carácter 
+        bool tiene_decimales = false;
+        for (char c : linea) {
+            if (c == '.') {
+                tiene_decimales = true;
+                break;
+            }
+        }
+        // Si se encontró un decimal, imprimir un mensaje
+        if (tiene_decimales) {
+            cout << "Se encontró un valor decimal en la línea: " << linea << endl;
         }
     }
+    archivo.close();
 }
 
-
 int main() {
-    // Variables para los parámetros de procesadores y hilos que se leerán del archivo
+    string archivo = "procesos.dat";
     int procesadores = 0;
     int hilos_totales = 0;
 
-    // Abrir el archivo para leer los parámetros de procesadores e hilos
-    ifstream infile("procesos.dat");
-    if (!infile.is_open()) {
-        cerr << "Error al abrir el archivo." << endl;
-        return 1;
-    }
+    // Llamamos a la función para validar si el archivo contiene decimales antes de procesarlo
+    contiene_decimales(archivo);
 
-    // Leer las primeras dos líneas del archivo para obtener procesadores y hilos
-    string line;
+    // Creamos el scheduler
+    MultilevelFeedbackQueueScheduler scheduler(4);  // Aquí puedes cambiar el número de hilos disponibles
 
-    // Leer la línea de Procesadores
-    if (getline(infile, line)) {
-        istringstream ss(line);
-        string label;
-        ss >> label >> procesadores;  // Leer la palabra "Procesadores" y luego el número
-    }
+    // Cargar procesos desde el archivo
+    cargar_procesos_desde_archivo(archivo, scheduler, procesadores, hilos_totales);
 
-    // Leer la línea de Hilos
-    if (getline(infile, line)) {
-        istringstream ss(line);
-        string label;
-        ss >> label >> hilos_totales;  // Leer la palabra "Hilos" y luego el número
-    }
-    cout << "Configuracion:" << endl;
-    cout << "Procesadores: " << procesadores << endl;
-    cout << "Hilos: " << hilos_totales << endl;
-
-
-
-
-    // Crear el scheduler con el número de hilos disponibles
-    MultilevelFeedbackQueueScheduler scheduler(hilos_totales);
-
-    // Cargar los procesos desde el archivo (saltando las dos primeras líneas ya leídas)
-    cargar_procesos_desde_archivo("procesos.dat", scheduler, procesadores, hilos_totales);
-
-    // Ejecutar los procesos
+    // Ejecutar los procesos cargados
     scheduler.ejecutar_procesos();
 
     return 0;
