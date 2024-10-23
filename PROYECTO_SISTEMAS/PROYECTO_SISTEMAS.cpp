@@ -6,6 +6,7 @@
 #include <sstream>
 #include <fstream>
 #include <vector>
+#include <set>
 #include <stdexcept>
 
 using namespace std;
@@ -76,6 +77,7 @@ public:
             cout << "Agregando Proceso " << proceso->pid << " a la cola de alta prioridad" << endl;
             cola_A.push(proceso);
             hilos_disponibles -= proceso->hilos;  // Reducir los hilos disponibles
+            cout << "Hilos disponibles: " << hilos_disponibles << endl;
         }
         else {
             // Si no hay suficientes hilos, colocarlo en la cola de espera
@@ -85,9 +87,22 @@ public:
             cola_espera.push(proceso);
         }
     }
+    void promocionar_procesos() {
+        cout << "Promoviendo todos los procesos a la cola de alta prioridad para evitar Starvation" << endl;
+        while (!cola_B.empty()) {
+            cola_A.push(cola_B.front());
+            cola_B.pop();
+        }
+        while (!cola_C.empty()) {
+            cola_A.push(cola_C.front());
+            cola_C.pop();
+        }
+        ultimo_tiempo_promocion = tiempo_total;
+    }
 
     void liberar_hilos(Proceso* proceso) {
         hilos_disponibles += proceso->hilos;  // Liberar los hilos cuando un proceso termina
+        cout << "Hilos disponibles: " << hilos_disponibles << endl;
     }
 
     void verificar_cola_espera() {
@@ -110,15 +125,18 @@ public:
     void ejecutar_procesos() {
         while (!cola_A.empty() || !cola_B.empty() || !cola_C.empty() || !cola_espera.empty()) {
             verificar_cola_espera();  // Verificar si algún proceso de espera puede ejecutarse
-
+            if (tiempo_total - ultimo_tiempo_promocion >= 60) {
+                promocionar_procesos();
+            }
             if (!cola_A.empty()) {
                 Proceso* proceso = cola_A.front();
                 cola_A.pop();
-                proceso->ejecutar(5);
-                tiempo_total += 5;
+                proceso->ejecutar(proceso->quantum);
+                tiempo_total += proceso->quantum;
 
                 if (proceso->estado == "terminado") {
                     liberar_hilos(proceso);  // Liberar los hilos si el proceso ha terminado
+
                 }
                 else {
                     cola_B.push(proceso);
@@ -127,8 +145,8 @@ public:
             else if (!cola_B.empty()) {
                 Proceso* proceso = cola_B.front();
                 cola_B.pop();
-                proceso->ejecutar(10);
-                tiempo_total += 10;
+                proceso->ejecutar(proceso->quantum);
+                tiempo_total += proceso->quantum;
 
                 if (proceso->estado == "terminado") {
                     liberar_hilos(proceso);  // Liberar los hilos si el proceso ha terminado
@@ -159,6 +177,7 @@ void cargar_procesos_desde_archivo(string archivo, MultilevelFeedbackQueueSchedu
     ifstream infile(archivo);
     string line;
     int linea_actual = 0;
+    set<int> pids;  // Conjunto para almacenar los PIDs únicos
 
     while (getline(infile, line)) {
         linea_actual++;
@@ -168,16 +187,16 @@ void cargar_procesos_desde_archivo(string archivo, MultilevelFeedbackQueueSchedu
         // Leer las dos primeras líneas para capturar los procesadores e hilos
         if (linea_actual == 1) {
             ss >> item >> procesadores;  // Leer el número de procesadores
-            if (procesadores == 0) {
-                cout << "Error: El numero de procesadores no puede ser 0. Por favor, ingrese un numero valido." << endl;
+            if (procesadores <= 0) {
+                cout << "Error: El numero de procesadores no puede ser 0 o menor. Por favor, ingrese un numero valido." << endl;
                 return;
             }
             continue;
         }
         if (linea_actual == 2) {
             ss >> item >> hilos_totales;  // Leer el número de hilos totales
-            if (hilos_totales == 0) {
-                cout << "Error: El numero de hilos no puede ser 0. Por favor, ingrese un numero valido." << endl;
+            if (hilos_totales <= 0) {
+                cout << "Error: El numero de hilos no puede ser 0 o menor. Por favor, ingrese un numero valido." << endl;
                 return;
             }
             continue;
@@ -209,10 +228,19 @@ void cargar_procesos_desde_archivo(string archivo, MultilevelFeedbackQueueSchedu
             int iteracion = stoi(data[7]);
 
             // Validar que ningún valor numérico sea negativo o cero
-            if (pid <= 0 || ppid <= 0 || registros <= 0 || tamano <= 0 || hilos <= 0 || quantum <= 0 || iteracion <= 0) {
+            if (pid <= 0 || registros <= 0 || tamano <= 0 || hilos <= 0 || quantum <= 0 || iteracion <= 0) {
                 cout << "Error: Proceso con valores negativos o cero en la linea: " << line << endl;
                 continue;
             }
+
+            // Verificar si el PID ya ha sido agregado
+            if (pids.find(pid) != pids.end()) {
+                cout << "Proceso con PID " << pid << " ya ha sido cargado, omitiendo duplicado en la linea: " << line << endl;
+                continue;  // Ignorar el proceso duplicado
+            }
+
+            // Si el PID no está duplicado, agregarlo al conjunto
+            pids.insert(pid);
 
             // Crear el proceso y agregarlo al scheduler
             Proceso* proceso = new Proceso(pid, ppid, pc, registros, tamano, hilos, quantum, iteracion);
@@ -258,20 +286,42 @@ void contiene_decimales(const string& nombreArchivo) {
 }
 
 int main() {
-    string archivo = "procesos.dat";
+    // Variables para los parámetros de procesadores y hilos que se leerán del archivo
     int procesadores = 0;
-    int hilos_totales = 0;
+    int hilos_por_procesador = 0;
 
-    // Llamamos a la función para validar si el archivo contiene decimales antes de procesarlo
-    contiene_decimales(archivo);
+    // Abrir el archivo para leer los parámetros de procesadores e hilos
+    ifstream infile("procesos.dat");
+    if (!infile.is_open()) {
+        cerr << "Error al abrir el archivo." << endl;
+        return 1;
+    }
+    // Leer las primeras dos líneas del archivo para obtener procesadores y hilos
+    string line;
+    // Leer la línea de Procesadores
+    if (getline(infile, line)) {
+        istringstream ss(line);
+        string label;
+        ss >> label >> procesadores;  // Leer la palabra "Procesadores" y luego el número
+    }
+    // Leer la línea de Hilos
+    if (getline(infile, line)) {
+        istringstream ss(line);
+        string label;
+        ss >> label >> hilos_por_procesador;  // Leer la palabra "Hilos" y luego el número
+    }
+    int hilosT = procesadores * hilos_por_procesador;
+    cout << "Configuracion:";
+    cout << "Procesadores: " << procesadores << "\t";
+    cout << "Hilos por procesador: " << hilos_por_procesador << "\t";
+    cout << "Hilos totales: " << hilosT << endl;
 
-    // Creamos el scheduler
-    MultilevelFeedbackQueueScheduler scheduler(4);  // Aquí puedes cambiar el número de hilos disponibles
+    // Crear el scheduler con el número de hilos disponibles
+    MultilevelFeedbackQueueScheduler scheduler(hilosT);
+    // Cargar los procesos desde el archivo (saltando las dos primeras líneas ya leídas)
+    cargar_procesos_desde_archivo("procesos.dat", scheduler, procesadores, hilosT);
 
-    // Cargar procesos desde el archivo
-    cargar_procesos_desde_archivo(archivo, scheduler, procesadores, hilos_totales);
-
-    // Ejecutar los procesos cargados
+    // Ejecutar los procesos
     scheduler.ejecutar_procesos();
 
     return 0;
