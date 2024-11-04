@@ -37,12 +37,19 @@ public:
         tiempo_ejecucion = 0;
     }
 
-    void ejecutar(int quantum) {
+    void ejecutar(int quantum, int hilos_procesador) {
         cout << "Ejecutando Proceso " << pid << " en estado " << estado << endl;
         estado = "ejecucion";
-        this_thread::sleep_for(chrono::seconds(quantum));
+
+        if (hilos_procesador <= 0) {
+            cerr << "Error: El numero de hilos de procesador debe ser mayor que 0." << endl;
+            exit(1);
+        }
+        int tiempo_ejecucion_real = quantum / hilos_procesador;  // Simula mayor velocidad con más hilos
+        this_thread::sleep_for(chrono::seconds(tiempo_ejecucion_real));
+
         iteracion--;
-        tiempo_ejecucion += quantum;
+        tiempo_ejecucion += tiempo_ejecucion_real;
 
         if (iteracion <= 0) {
             estado = "terminado";
@@ -50,7 +57,8 @@ public:
         }
         else {
             estado = "listo";
-            cout << "Proceso " << pid << " ha completado " << quantum << " segundos de ejecucion, le quedan " << iteracion << " iteraciones" << endl;
+            cout << "Proceso " << pid << " ha completado " << tiempo_ejecucion_real
+                << " segundos de ejecucion, le quedan " << iteracion << " iteraciones" << endl;
         }
     }
 };
@@ -60,33 +68,19 @@ public:
     queue<Proceso*> cola_A;
     queue<Proceso*> cola_B;
     queue<Proceso*> cola_C;
-    queue<Proceso*> cola_espera;  // Cola para procesos que esperan por hilos
     int tiempo_total;
     int ultimo_tiempo_promocion;
-    int hilos_disponibles;
 
     MultilevelFeedbackQueueScheduler(int hilos_totales) {
         tiempo_total = 0;
         ultimo_tiempo_promocion = 0;
-        hilos_disponibles = hilos_totales;  // Inicializa con los hilos disponibles en el sistema
     }
 
     void agregar_proceso(Proceso* proceso) {
-        // Validar si los hilos disponibles son suficientes para este proceso
-        if (proceso->hilos <= hilos_disponibles) {
-            cout << "Agregando Proceso " << proceso->pid << " a la cola de alta prioridad" << endl;
-            cola_A.push(proceso);
-            hilos_disponibles -= proceso->hilos;  // Reducir los hilos disponibles
-            cout << "Hilos disponibles: " << hilos_disponibles << endl;
-        }
-        else {
-            // Si no hay suficientes hilos, colocarlo en la cola de espera
-            cout << "Proceso " << proceso->pid << " necesita " << proceso->hilos
-                << " hilos, pero solo hay " << hilos_disponibles << " disponibles. "
-                << "Colocando en la cola de espera." << endl;
-            cola_espera.push(proceso);
-        }
+        cout << "Agregando Proceso " << proceso->pid << " a la cola de alta prioridad" << endl;
+        cola_A.push(proceso);
     }
+
     void promocionar_procesos() {
         cout << "Promoviendo todos los procesos a la cola de alta prioridad para evitar Starvation" << endl;
         while (!cola_B.empty()) {
@@ -100,77 +94,37 @@ public:
         ultimo_tiempo_promocion = tiempo_total;
     }
 
-    void liberar_hilos(Proceso* proceso) {
-        hilos_disponibles += proceso->hilos;  // Liberar los hilos cuando un proceso termina
-        cout << "Hilos disponibles: " << hilos_disponibles << endl;
-    }
-
-    void verificar_cola_espera() {
-        // Verificar si algún proceso en espera puede ejecutarse
-        while (!cola_espera.empty()) {
-            Proceso* proceso = cola_espera.front();
-            if (proceso->hilos <= hilos_disponibles) {
-                cout << "Agregando Proceso " << proceso->pid << " desde la cola de espera a la cola de alta prioridad" << endl;
-                cola_espera.pop();
-                cola_A.push(proceso);
-                hilos_disponibles -= proceso->hilos;
-            }
-            else {
-                // Si el primer proceso no puede ser ejecutado, salir
-                break;
-            }
-        }
-    }
-
-    void ejecutar_procesos() {
-        while (!cola_A.empty() || !cola_B.empty() || !cola_C.empty() || !cola_espera.empty()) {
-            verificar_cola_espera();  // Verificar si algún proceso de espera puede ejecutarse
+    void ejecutar_procesos(int hilos_procesador) {
+        while (!cola_A.empty() || !cola_B.empty() || !cola_C.empty()) {
             if (tiempo_total - ultimo_tiempo_promocion >= 60) {
                 promocionar_procesos();
             }
+
             if (!cola_A.empty()) {
-                Proceso* proceso = cola_A.front();
-                cola_A.pop();
-                proceso->ejecutar(proceso->quantum);
-                tiempo_total += proceso->quantum;
-
-                if (proceso->estado == "terminado") {
-                    liberar_hilos(proceso);  // Liberar los hilos si el proceso ha terminado
-
-                }
-                else {
-                    cola_B.push(proceso);
-                }
+                ejecutar_proceso_de_cola(cola_A, hilos_procesador);
             }
             else if (!cola_B.empty()) {
-                Proceso* proceso = cola_B.front();
-                cola_B.pop();
-                proceso->ejecutar(proceso->quantum);
-                tiempo_total += proceso->quantum;
-
-                if (proceso->estado == "terminado") {
-                    liberar_hilos(proceso);  // Liberar los hilos si el proceso ha terminado
-                }
-                else {
-                    cola_C.push(proceso);
-                }
+                ejecutar_proceso_de_cola(cola_B, hilos_procesador);
             }
             else if (!cola_C.empty()) {
-                Proceso* proceso = cola_C.front();
-                cola_C.pop();
-                proceso->ejecutar(proceso->quantum);
-                tiempo_total += proceso->quantum;
-
-                if (proceso->estado == "terminado") {
-                    liberar_hilos(proceso);  // Liberar los hilos si el proceso ha terminado
-                }
-                else {
-                    cola_C.push(proceso);
-                }
+                ejecutar_proceso_de_cola(cola_C, hilos_procesador);
             }
         }
     }
+
+private:
+    void ejecutar_proceso_de_cola(queue<Proceso*>& cola, int hilos_procesador) {
+        Proceso* proceso = cola.front();
+        cola.pop();
+        proceso->ejecutar(proceso->quantum, hilos_procesador);
+        tiempo_total += proceso->quantum;
+
+        if (proceso->estado != "terminado") {
+            cola.push(proceso);
+        }
+    }
 };
+
 
 // Función para cargar procesos que no sean 0
 void cargar_procesos_desde_archivo(string archivo, MultilevelFeedbackQueueScheduler& scheduler, int& procesadores, int& hilos_totales) {
@@ -310,8 +264,16 @@ int main() {
         string label;
         ss >> label >> hilos_por_procesador;  // Leer la palabra "Hilos" y luego el número
     }
+    infile.close();
+
+    // Validación de hilos_por_procesador para evitar valor 0
+    if (hilos_por_procesador <= 0) {
+        cerr << "Error: El número de hilos por procesador debe ser mayor a 0." << endl;
+        return 1;
+    }
+
     int hilosT = procesadores * hilos_por_procesador;
-    cout << "Configuracion:";
+    cout << "Configuracion:\n";
     cout << "Procesadores: " << procesadores << "\t";
     cout << "Hilos por procesador: " << hilos_por_procesador << "\t";
     cout << "Hilos totales: " << hilosT << endl;
@@ -321,8 +283,8 @@ int main() {
     // Cargar los procesos desde el archivo (saltando las dos primeras líneas ya leídas)
     cargar_procesos_desde_archivo("procesos.dat", scheduler, procesadores, hilosT);
 
-    // Ejecutar los procesos
-    scheduler.ejecutar_procesos();
+    // Ejecutar los procesos pasando el número de hilos por procesador
+    scheduler.ejecutar_procesos(hilos_por_procesador);
 
     return 0;
 }

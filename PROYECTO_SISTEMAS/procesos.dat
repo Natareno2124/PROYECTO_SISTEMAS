@@ -1,6 +1,5 @@
-Procesadores 5
-Hilos 5
-
+Procesadores 1
+Hilos 3
 12344|0|ControlP|20|4096|3|5|50
 54332|12344|ControlPH|10|2048|3|5|5
 54333|12344|ControlPH|10|2048|3|5|5
@@ -21,10 +20,3 @@ Hilos 5
 54455|12346|ResponseL|4|1024|2|3|8
 54456|12346|ResponseL|4|1024|2|3|8
 54457|12346|ResponseL|4|1024|2|3|8
-54458|12346|ResponseL|4|1024|2|3|8
-
-
-
-
-
-
